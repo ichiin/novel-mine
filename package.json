@@ -20,6 +20,7 @@
   },
   "homepage": "https://github.com/ichiin/novel-mine#readme",
   "dependencies": {
+    "pdfkit": "^0.13.0",
     "puppeteer": "^13.0.1"
   }
 }

@@ -1,9 +1,21 @@
+const fs = require('fs');
+const PDFDocument = require('pdfkit');
 const puppeteer = require('puppeteer');
 
+const createBook = async (url, name) => {
+    const chapters = await scrapeNovel(url);
+    writePDF(chapters, name);
+}
+
 const getChapterContent = async (page) => {
-    let chapterContent = await page.waitForSelector(".chapter-content")
-    let chapterText = await page.evaluate(chapter => chapter.textContent, chapterContent)
+    let chapterContent = await page.waitForSelector(".chapter-content");
+    let chapterText = await page.evaluate(chapter => chapter.textContent, chapterContent);
     return chapterText;
+};
+
+const getNovelName = (url) => {
+    const chapterDashName = url.split('/')[3];
+    return chapterDashName;
 }
 
 const hasNextChapter = async (page) => {
@@ -11,28 +23,54 @@ const hasNextChapter = async (page) => {
     .then(() => { return true; })
     .catch(() => { return false ;})
     return hasNext;
-}
+};
 
 const navigateToNextPage = async (page) => {
     await Promise.all([
         page.waitForNavigation(),
         page.click('#next_chap'),
       ]);
-}
+};
 
-const scrape = async() => {
+const scrapeNovel = async(url) => {
+    console.time('Scrape time');
     const browser = await puppeteer.launch({});
     const page = await browser.newPage();
-    await page.goto('https://mnovelfree.com/unrivaled-medicine-god-060122/chapter-1')
-   //let chapterText = await getChapterContent(page);
+    let chapters = [];
+    let chapterText = '';
+    await page.goto(url)
+    console.log('Downloading chapters...')
    let hasNext = await hasNextChapter(page);
    while(hasNext){
-       console.log('-- Onward to next chapter --')
+       chapterText = await getChapterContent(page);
+       chapters.push(chapterText);
+       console.log('-- Onward to next chapter --');
        await navigateToNextPage(page);
        hasNext = await hasNextChapter(page);
    }
-   console.log('All chapter parsed ;D')
+   chapterText = await getChapterContent(page);
+   chapters.push(chapterText);
    await browser.close();
-}
+   console.timeEnd('Scrape time');
+   return chapters;
+};
 
-scrape();
+const writePDF = (chapters, name) => {
+    let pdfDoc = new PDFDocument;
+    const chapterSpaceName = name.replace(/-/g, ' ');
+    pdfDoc.pipe(fs.createWriteStream(name + '.pdf'));
+    pdfDoc.text(chapterSpaceName, { align: 'center', height: 200 })
+    pdfDoc.text(chapters.join('\r\n'), {lineGap: 10});
+    pdfDoc.end();
+};
+
+if(process.argv.length === 2 ){
+    console.error('Pass the first chapter URL from https://mnovelfree.com/ you want to download');
+    process.exit(1);
+}else if(process.argv.length > 3 ){
+    console.error('Pass only the URL of the first chapter as argument')
+}else{
+    const firstChapterURL = process.argv[2];
+    const novelName = getNovelName(firstChapterURL);
+    createBook(firstChapterURL, novelName);
+}

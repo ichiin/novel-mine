@@ -7,6 +7,12 @@ const createBook = async (url, name) => {
     writePDF(chapters, name);
 }
 
+const getChapterName = async(page) => {
+    let chapterName = await page.waitForSelector(".chapter-text-detail");
+    let chapterNameText = await page.evaluate(chapter => chapter.textContent, chapterName);
+    return chapterNameText.concat('\n');
+}
+
 const getChapterContent = async (page) => {
     let chapterContent = await page.waitForSelector(".chapter-content");
     let chapterText = await page.evaluate(chapter => chapter.textContent, chapterContent);
@@ -38,18 +44,20 @@ const scrapeNovel = async(url) => {
     const page = await browser.newPage();
     let chapters = [];
     let chapterText = '';
+    let chapterName = '';
     await page.goto(url)
     console.log('Downloading chapters...')
    let hasNext = await hasNextChapter(page);
    while(hasNext){
        chapterText = await getChapterContent(page);
-       chapters.push(chapterText);
+       chapterName = await getChapterName(page);
+       chapters.push(chapterName.concat(chapterText));
        console.log('-- Onward to next chapter --');
        await navigateToNextPage(page);
        hasNext = await hasNextChapter(page);
    }
    chapterText = await getChapterContent(page);
-   chapters.push(chapterText);
+   chapters.push(chapterName.concat(chapterText));
    await browser.close();
    console.timeEnd('Scrape time');
    return chapters;
@@ -57,9 +65,9 @@ const scrapeNovel = async(url) => {
 
 const writePDF = (chapters, name) => {
     let pdfDoc = new PDFDocument;
-    const chapterSpaceName = name.replace(/-/g, ' ');
+    const novelSpaceName = name.replace(/-/g, ' ');
     pdfDoc.pipe(fs.createWriteStream(name + '.pdf'));
-    pdfDoc.text(chapterSpaceName, { align: 'center', height: 200 })
+    pdfDoc.text(novelSpaceName, { align: 'center', height: 200 })
     pdfDoc.text(chapters.join('\r\n'), {lineGap: 10});
     pdfDoc.end();
 };
